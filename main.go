@@ -55,16 +55,12 @@ type MiddlewareFunc func(http.Handler) http.Handler
 
 func applyMiddlewareTo(handler http.Handler, middlewareHandlers []MiddlewareFunc) http.Handler {
 	next := handler
-	for _, middlewareHandler := range middlewareHandlers {
+	for i:=len(middlewareHandlers)-1;i>=0;i--{
+		middlewareHandler := middlewareHandlers[i]
 		next = middlewareHandler(next)
+
 	}
 	return next
-}
-
-func reverse(s []MiddlewareFunc) {
-	for i, j := 0, len(s)-1; i < j; i, j = i+1, j-1 {
-		s[i], s[j] = s[j], s[i]
-	}
 }
 
 // Port allows setting the HTTP server port. Default is ":8080".
@@ -198,10 +194,9 @@ func applyOptions(options []func(*serverOpts)) *serverOpts {
 	return httpServerOpts
 }
 
-// Serve will start an HTTP server and serve the RPC methods.
-func Serve(grpcServer interface{}, options ...func(*serverOpts)) {
+// Mux creates a ServeMux capable of handling the RPC methods.
+func Mux(grpcServer interface{}, options ...func(*serverOpts)) *http.ServeMux {
 	httpServerOpts := applyOptions(options)
-	reverse(httpServerOpts.middlewareHandlers)
 	grpcServerType := reflect.TypeOf(grpcServer)
 	mux := http.NewServeMux()
 
@@ -241,6 +236,14 @@ func Serve(grpcServer interface{}, options ...func(*serverOpts)) {
 			w.WriteHeader(healthcheckStatus)
 		})
 	}
+
+	return mux
+}
+
+// Serve will start an HTTP server and serve the RPC methods.
+func Serve(grpcServer interface{}, options ...func(*serverOpts)) {
+	mux := Mux(grpcServer, options...)
+	httpServerOpts := applyOptions(options)
 
 	serverHTTP := &http.Server{Addr: httpServerOpts.port, Handler: mux}
 
